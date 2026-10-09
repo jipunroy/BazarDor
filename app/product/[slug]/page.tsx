@@ -1,112 +1,99 @@
 
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { notFound, redirect } from "next/navigation";
+import { Suspense } from "react";
+import { auth } from "@/lib/auth";
 import { getProduct } from "@/lib/api";
 
 type Props = {
   params: Promise<{ slug: string }>;
 };
 
-function formatPrice(value: unknown): string {
-  if (value === null || value === undefined || value === "") {
-    return "তথ্য নেই";
+async function ProductContent({ params }: Props) {
+  const { slug } = await params;
+
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+
+  if (!session) {
+    redirect(`/signin?callbackURL=${encodeURIComponent(`/product/${slug}`)}`);
   }
 
-  const price = Number(value);
-
-  return Number.isFinite(price)
-    ? `${price.toLocaleString("bn-BD")} টাকা`
-    : "তথ্য নেই";
-}
-
-function getChange(value: unknown): number {
-  const parsed = Number(
-    String(value ?? 0).replace(/,/g, "").replace(/%/g, "").trim()
-  );
-
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-export default async function ProductDetailsPage({
-  params,
-}: Props) {
-  const { slug } = await params;
   const product = await getProduct(slug);
 
   if (!product) notFound();
 
-  const change = getChange(
-    product.changePercent ?? product.change
-  );
+  const price = Number(product.price);
+  const formattedPrice = Number.isFinite(price)
+    ? price.toLocaleString("bn-BD", { maximumFractionDigits: 2 })
+    : "তথ্য নেই";
 
   return (
-    <main className="min-h-screen px-4 py-8">
+    <main className="min-h-screen bg-[#f1f6f1] px-4 py-8">
       <div className="mx-auto max-w-3xl">
-        <Link
-          href="/"
-          className="text-xs text-[#07833f] hover:underline"
-        >
-          ← সব পণ্যে ফিরে যান
+        <Link href="/" className="text-sm font-medium text-[#07833f] hover:underline">
+          ← হোম পেজে ফিরে যান
         </Link>
 
-        <article className="mt-5 rounded-2xl border border-[#e3ebe3] bg-[#fbfdfb] p-5 sm:p-8">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#edf5ed] text-4xl">
+        <section className="mt-5 rounded-2xl border border-[#e3ebe3] bg-[#fbfdfb] p-6 sm:p-8">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f0f5ef] text-4xl">
             {product.emoji || "🛒"}
           </div>
 
-          <h1 className="mt-5 text-2xl font-extrabold text-[#26332a]">
+          <p className="mt-5 text-sm text-[#788078]">পণ্যের বিস্তারিত</p>
+          <h1 className="mt-1 text-2xl font-extrabold text-[#26332a]">
             {product.name}
           </h1>
 
           <p className="mt-2 text-sm text-[#788078]">
-            {product.unit || "একক উল্লেখ নেই"}
+            একক: {product.unit || "নির্ধারিত নয়"}
           </p>
 
           <div className="mt-6 rounded-xl bg-[#edf6ee] p-5">
-            <p className="text-xs text-[#657467]">
-              বর্তমান বাজারদর
+            <p className="text-sm text-[#617263]">বর্তমান বাজারদর</p>
+            <p className="mt-1 text-3xl font-extrabold text-[#07833f]">
+              {formattedPrice} টাকা
             </p>
-
-            <p className="mt-2 text-3xl font-extrabold text-[#07833f]">
-              {formatPrice(product.price)}
-            </p>
-          </div>
-
-          <div className="mt-5 rounded-xl border border-[#e3ebe3] p-4">
-            <p className="text-xs text-[#788078]">
-              দামের পরিবর্তন
-            </p>
-
-            <p
-              className={`mt-2 text-sm font-semibold ${
-                change > 0
-                  ? "text-red-500"
-                  : change < 0
-                    ? "text-emerald-700"
-                    : "text-gray-500"
-              }`}
-            >
-              {change > 0
-                ? `▲ ${change.toLocaleString("bn-BD")}% দাম বেড়েছে`
-                : change < 0
-                  ? `▼ ${Math.abs(change).toLocaleString("bn-BD")}% দাম কমেছে`
-                  : "দামের পরিবর্তনের তথ্য নেই"}
+            <p className="mt-1 text-xs text-[#788078]">
+              {product.unit ? `প্রতি ${product.unit}` : "প্রতি একক"}
             </p>
           </div>
 
           {product.description && (
-            <div className="mt-6 border-t border-[#e3ebe3] pt-5">
-              <h2 className="font-bold text-[#26332a]">
-                পণ্যের বিবরণ
-              </h2>
-
-              <p className="mt-2 text-sm leading-7 text-[#687268]">
+            <div className="mt-6">
+              <h2 className="text-base font-bold text-[#26332a]">পণ্যের বিবরণ</h2>
+              <p className="mt-2 text-sm leading-6 text-[#788078]">
                 {product.description}
               </p>
             </div>
           )}
-        </article>
+
+          <p className="mt-6 text-xs leading-5 text-[#788078]">
+            বাজারদর সময়ের সঙ্গে পরিবর্তিত হতে পারে। কেনাকাটার আগে স্থানীয়
+            বাজারে দাম যাচাই করে নাও।
+          </p>
+        </section>
       </div>
     </main>
+  );
+}
+
+export default function ProductPage({ params }: Props) {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#f1f6f1] px-4 py-8">
+          <div className="mx-auto max-w-3xl animate-pulse rounded-2xl bg-[#e2ebe2] p-8">
+            <div className="h-8 w-40 rounded bg-white/70" />
+            <div className="mt-6 h-6 w-2/3 rounded bg-white/70" />
+            <div className="mt-4 h-28 rounded-xl bg-white/70" />
+          </div>
+        </main>
+      }
+    >
+      <ProductContent params={params} />
+    </Suspense>
   );
 }

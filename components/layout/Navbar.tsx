@@ -1,9 +1,12 @@
+
 "use client";
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
+import { authClient } from "@/lib/auth-client";
 import PriceTicker from "./PriceTicker";
 import type { Category, Product } from "@/types";
 
@@ -11,11 +14,15 @@ const API_URL = "https://api.abcz.workers.dev/api/bazardor";
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [banglaDate, setBanglaDate] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const { data: session, isPending } = authClient.useSession();
 
   useEffect(() => {
     setBanglaDate(
@@ -43,8 +50,17 @@ export default function Navbar() {
           productResponse.json(),
         ]);
 
-        setCategories(categoryData);
-        setProducts(productData);
+        setCategories(
+          Array.isArray(categoryData)
+            ? categoryData
+            : categoryData.categories ?? []
+        );
+
+        setProducts(
+          Array.isArray(productData)
+            ? productData
+            : productData.products ?? []
+        );
       } catch (error) {
         console.error("Navbar data error:", error);
       }
@@ -53,14 +69,102 @@ export default function Navbar() {
     loadData();
   }, []);
 
-  function isActive(slug: string) {
+  function isActive(slug: string | number) {
     return pathname === `/category/${slug}`;
+  }
+
+  async function handleSignOut() {
+    setLoggingOut(true);
+
+    try {
+      const result = await authClient.signOut();
+
+      if (result.error) {
+        toast.error("লগআউট করা যায়নি। আবার চেষ্টা করো।");
+        return;
+      }
+
+      setMenuOpen(false);
+      toast.success("সফলভাবে লগআউট হয়েছে।");
+      router.push("/");
+      router.refresh();
+    } catch {
+      toast.error("সমস্যা হয়েছে। আবার চেষ্টা করো।");
+    } finally {
+      setLoggingOut(false);
+    }
+  }
+
+  function AuthLinks({ mobile = false }: { mobile?: boolean }) {
+    if (isPending) {
+      return (
+        <span className="inline-block h-9 w-24 animate-pulse rounded-lg bg-gray-100" />
+      );
+    }
+
+    if (session) {
+      return (
+        <>
+          <Link
+            href="/profile"
+            onClick={() => setMenuOpen(false)}
+            className={
+              mobile
+                ? "flex-1 rounded-lg border border-emerald-700 px-3 py-2 text-center text-sm text-emerald-800"
+                : "rounded-lg border border-emerald-700 px-4 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50"
+            }
+          >
+            {session.user.name || "আমার অ্যাকাউন্ট"}
+          </Link>
+
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={loggingOut}
+            className={
+              mobile
+                ? "flex-1 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-700 disabled:opacity-60"
+                : "rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 disabled:opacity-60"
+            }
+          >
+            {loggingOut ? "অপেক্ষা করো..." : "লগআউট"}
+          </button>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <Link
+          href="/signin"
+          onClick={() => setMenuOpen(false)}
+          className={
+            mobile
+              ? "flex-1 rounded-lg border border-emerald-700 px-3 py-2 text-center text-sm text-emerald-800"
+              : "rounded-lg border border-emerald-700 px-4 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50"
+          }
+        >
+          সাইন ইন
+        </Link>
+
+        <Link
+          href="/signup"
+          onClick={() => setMenuOpen(false)}
+          className={
+            mobile
+              ? "flex-1 rounded-lg bg-emerald-700 px-3 py-2 text-center text-sm text-white"
+              : "rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
+          }
+        >
+          সাইন আপ
+        </Link>
+      </>
+    );
   }
 
   return (
     <header className="sticky top-0 z-50 bg-white shadow-sm">
       <div className="mx-auto max-w-7xl px-4">
-        {/* Main navbar */}
         <div className="flex min-h-20 items-center justify-between gap-4">
           <Link href="/" className="flex shrink-0 items-center gap-3">
             <Image
@@ -71,48 +175,31 @@ export default function Navbar() {
               priority
               className="h-11 w-11 object-contain"
             />
-
             <div>
               <h1 className="text-xl font-bold text-emerald-800 sm:text-2xl">
                 বাজার দর
               </h1>
-
               <p className="text-xs text-gray-500">
                 {banglaDate || "বাংলাদেশের বাজার"}
               </p>
             </div>
           </Link>
 
-          {/* Desktop auth buttons */}
           <div className="hidden items-center gap-3 sm:flex">
-            <Link
-              href="/signin"
-              className="rounded-lg border border-emerald-700 px-4 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50"
-            >
-              সাইন ইন
-            </Link>
-
-            <Link
-              href="/signup"
-              className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
-            >
-              সাইন আপ
-            </Link>
+            <AuthLinks />
           </div>
 
-          {/* Mobile menu button */}
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="Toggle navigation menu"
             aria-expanded={menuOpen}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-xl sm:hidden"
+            className="rounded-lg border border-gray-200 px-3 py-2 text-xl md:hidden"
           >
             {menuOpen ? "✕" : "☰"}
           </button>
         </div>
 
-        {/* Category navigation */}
         <nav className="hidden items-center gap-2 overflow-x-auto border-t border-gray-100 py-3 md:flex">
           <Link
             href="/"
@@ -128,9 +215,9 @@ export default function Navbar() {
           {categories.map((category) => (
             <Link
               key={category.id}
-              href={`/category/${category.id}`}
+              href={`/category/${category.slug ?? category.id}`}
               className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition ${
-                isActive(category.id)
+                isActive(category.slug ?? category.id)
                   ? "bg-emerald-700 text-white"
                   : "text-gray-600 hover:bg-emerald-50 hover:text-emerald-800"
               }`}
@@ -140,13 +227,14 @@ export default function Navbar() {
           ))}
         </nav>
 
-        {/* Mobile navigation */}
         {menuOpen && (
           <nav className="flex flex-col gap-2 border-t border-gray-100 py-3 md:hidden">
             <Link
               href="/"
               onClick={() => setMenuOpen(false)}
-              className="rounded-lg px-3 py-2 hover:bg-emerald-50"
+              className={`rounded-lg px-3 py-2 ${
+                pathname === "/" ? "bg-emerald-50 text-emerald-800" : ""
+              }`}
             >
               সব পণ্য
             </Link>
@@ -154,10 +242,10 @@ export default function Navbar() {
             {categories.map((category) => (
               <Link
                 key={category.id}
-                href={`/category/${category.id}`}
+                href={`/category/${category.slug ?? category.id}`}
                 onClick={() => setMenuOpen(false)}
                 className={`rounded-lg px-3 py-2 ${
-                  isActive(category.id)
+                  isActive(category.slug ?? category.id)
                     ? "bg-emerald-700 text-white"
                     : "hover:bg-emerald-50"
                 }`}
@@ -166,28 +254,13 @@ export default function Navbar() {
               </Link>
             ))}
 
-            <div className="mt-2 flex gap-2 border-t border-gray-100 pt-3 sm:hidden">
-              <Link
-                href="/signin"
-                onClick={() => setMenuOpen(false)}
-                className="flex-1 rounded-lg border border-emerald-700 px-3 py-2 text-center text-sm"
-              >
-                সাইন ইন
-              </Link>
-
-              <Link
-                href="/signup"
-                onClick={() => setMenuOpen(false)}
-                className="flex-1 rounded-lg bg-emerald-700 px-3 py-2 text-center text-sm text-white"
-              >
-                সাইন আপ
-              </Link>
+            <div className="mt-2 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
+              <AuthLinks mobile />
             </div>
           </nav>
         )}
       </div>
 
-      {/* Price ticker */}
       <PriceTicker products={products} />
     </header>
   );
