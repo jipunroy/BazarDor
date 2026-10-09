@@ -1,10 +1,13 @@
+
 import type { Metadata } from "next";
-import "./globals.css";
+import { Suspense } from "react";
 import Navbar from "@/components/layout/Navbar";
+import { Toaster } from "react-hot-toast";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "বাজার দর | BazarDor",
-  description: "বাংলাদেশের নিত্যপ্রয়োজনীয় পণ্যের বাজারদর এক নজরে।",
+  description: "বাংলাদেশের নিত্যপ্রয়োজনীয় পণ্যের বাজারদর",
 };
 
 export default function RootLayout({
@@ -15,8 +18,17 @@ export default function RootLayout({
   return (
     <html lang="bn">
       <body>
-        <Navbar />
+        <Suspense
+          fallback={
+            <header className="min-h-20 bg-white shadow-sm" />
+          }
+        >
+          <Navbar />
+        </Suspense>
+
         {children}
+
+        <Toaster position="top-right" />
       </body>
     </html>
   );
