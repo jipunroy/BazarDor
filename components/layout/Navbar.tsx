@@ -11,6 +11,41 @@ import { authClient } from "@/lib/auth-client";
 import PriceTicker from "./PriceTicker";
 import type { Category, Product } from "@/types";
 
+type ApiResponse<T> =
+  | T[]
+  | {
+      data?: T[] | { categories?: T[]; products?: T[] };
+      categories?: T[];
+      products?: T[];
+    };
+
+function extractItems<T>(
+  response: ApiResponse<T>,
+  key: "categories" | "products"
+): T[] {
+  if (Array.isArray(response)) {
+    return response;
+  }
+
+  if (Array.isArray(response[key])) {
+    return response[key];
+  }
+
+  if (Array.isArray(response.data)) {
+    return response.data;
+  }
+
+  if (
+    response.data &&
+    typeof response.data === "object" &&
+    Array.isArray(response.data[key])
+  ) {
+    return response.data[key];
+  }
+
+  return [];
+}
+
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -31,8 +66,11 @@ export default function Navbar() {
         day: "numeric",
         month: "long",
         year: "numeric",
+        timeZone: "Asia/Dhaka",
       }).format(new Date())
     );
+
+    let cancelled = false;
 
     async function loadData() {
       try {
@@ -41,56 +79,54 @@ export default function Navbar() {
           fetch("/api/bazardor/products"),
         ]);
 
-        if (!categoryResponse.ok) {
-          const errorText = await categoryResponse.text();
-
+        if (!categoryResponse.ok || !productResponse.ok) {
           throw new Error(
-            `Categories API failed: ${categoryResponse.status} ${errorText}`
+            `API request failed: categories=${categoryResponse.status}, products=${productResponse.status}`
           );
         }
 
-        if (!productResponse.ok) {
-          const errorText = await productResponse.text();
-
-          throw new Error(
-            `Products API failed: ${productResponse.status} ${errorText}`
-          );
-        }
-
-        const [categoryData, productData] = await Promise.all([
+        const [categoryJson, productJson] = await Promise.all([
           categoryResponse.json(),
           productResponse.json(),
         ]);
 
-        setCategories(
-          Array.isArray(categoryData)
-            ? categoryData
-            : Array.isArray(categoryData.categories)
-              ? categoryData.categories
-              : []
+        if (cancelled) return;
+
+        const categoryItems = extractItems<Category>(
+          categoryJson as ApiResponse<Category>,
+          "categories"
         );
 
-        setProducts(
-          Array.isArray(productData)
-            ? productData
-            : Array.isArray(productData.products)
-              ? productData.products
-              : []
+        const productItems = extractItems<Product>(
+          productJson as ApiResponse<Product>,
+          "products"
         );
+
+        setCategories(categoryItems);
+        setProducts(productItems);
       } catch (error) {
-        console.error("Navbar data error:", error);
+        if (!cancelled) {
+          console.error("Navbar data error:", error);
+          setCategories([]);
+          setProducts([]);
+        }
       }
     }
 
-    loadData();
+    void loadData();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function isActive(slug: string | number) {
     return pathname === `/category/${slug}`;
   }
 
-  // Logout
   async function handleSignOut() {
+    if (loggingOut) return;
+
     setLoggingOut(true);
 
     try {
@@ -114,7 +150,6 @@ export default function Navbar() {
     }
   }
 
-  // Login / Signup / Account links
   function AuthLinks({ mobile = false }: { mobile?: boolean }) {
     if (isPending) {
       return (

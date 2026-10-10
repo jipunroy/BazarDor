@@ -11,15 +11,24 @@ export default function SortSelect({
   onChange,
 }: SortSelectProps) {
   return (
-    <select
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      aria-label="পণ্য সাজানোর নিয়ম"
-      className="rounded-lg border border-[#dce7dc] bg-white px-3 py-2 text-xs text-[#354337] outline-none focus:border-[#07833f]"
-    >
-      <option value="default">ডিফল্ট</option>
-      <option value="low-high">দাম: কম থেকে বেশি</option>
-      <option value="high-low">দাম: বেশি থেকে কম</option>
-    </select>
+    <div className="flex items-center gap-2">
+      <label
+        htmlFor="product-sort"
+        className="shrink-0 text-sm text-gray-600"
+      >
+        সাজান:
+      </label>
+
+      <select
+        id="product-sort"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="rounded-lg border border-[#dce7dc] bg-white px-3 py-2 text-sm text-[#29362c] outline-none focus:border-emerald-600"
+      >
+        <option value="default">ডিফল্ট</option>
+        <option value="low-high">দাম: কম থেকে বেশি</option>
+        <option value="high-low">দাম: বেশি থেকে কম</option>
+      </select>
+    </div>
   );
 }

@@ -1,31 +1,17 @@
-import { NextResponse } from "next/server";
 
-const API_URL =
-  "https://api.api-store.workers.dev/api/bazardor";
+import { NextResponse } from "next/server";
+import { getProducts } from "@/lib/api";
 
 export async function GET() {
   try {
-    const response = await fetch(`${API_URL}/products`, {
-      cache: "no-store",
-    });
+    const products = await getProducts();
 
-    if (!response.ok) {
-      const details = await response.text();
-
-      console.error("Products API error:", response.status, details);
-
-      return NextResponse.json(
-        { error: "Products API unavailable" },
-        { status: 502 }
-      );
-    }
-
-    return NextResponse.json(await response.json());
+    return NextResponse.json(products);
   } catch (error) {
-    console.error("Products proxy error:", error);
+    console.error("Products API route error:", error);
 
     return NextResponse.json(
-      { error: "Failed to fetch products" },
+      { error: "পণ্যের তথ্য এখন পাওয়া যাচ্ছে না" },
       { status: 502 }
     );
   }

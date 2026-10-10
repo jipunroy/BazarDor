@@ -2,118 +2,171 @@
 import type { Category, Product } from "@/types";
 
 const API_URL =
-  "https://api.api-store.workers.dev/api/bazardor";
+  "https://openapi.programming-hero.com/api/bazardor";
 
-// API response-এর ধরন
-type ApiProduct = {
-  id: number | string;
-  slug?: string;
-  nameBn?: string;
-  category?: string;
-  categoryNameBn?: string;
-  categoryIcon?: string;
-  unit?: string;
-  image?: string;
-  today?: number;
-  yesterday?: number;
-  lastWeek?: number;
-  lastMonth?: number;
-  change?: {
-    dir?: "up" | "down" | "flat";
-    pct?: number;
-  };
-  markets?: Product["markets"];
-};
-
-type ApiCategory = {
-  id: string | number;
-  slug?: string;
-  nameBn?: string;
-  icon?: string;
-};
-
-// API থেকে data আনা
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url, {
-    cache: "no-store",
+    next: { revalidate: 60 },
   });
 
   if (!response.ok) {
-    throw new Error(
-      `API request failed: ${response.status} ${url}`
-    );
+    throw new Error(`BazarDor API error: ${response.status}`);
   }
 
   return response.json() as Promise<T>;
 }
 
-// API product-কে application-এর Product type-এ রূপান্তর
+// API array বা object-এর ভেতরে array দিতে পারে।
+function extractArray<T>(
+  response: unknown,
+  possibleKeys: string[]
+): T[] {
+  if (Array.isArray(response)) {
+    return response as T[];
+  }
+
+  if (!response || typeof response !== "object") {
+    return [];
+  }
+
+  const obj = response as Record<string, unknown>;
+
+  for (const key of possibleKeys) {
+    if (Array.isArray(obj[key])) {
+      return obj[key] as T[];
+    }
+  }
+
+  if (obj.data && typeof obj.data === "object") {
+    return extractArray<T>(obj.data, possibleKeys);
+  }
+
+  return [];
+}
+
+type ApiProduct = {
+  id?: number | string;
+  _id?: string;
+  slug?: string;
+  name?: string;
+  nameBn?: string;
+  name_bn?: string;
+  category?: string;
+  categoryNameBn?: string;
+  categoryIcon?: string;
+  image?: string;
+  emoji?: string;
+  unit?: string;
+  today?: number | string;
+  yesterday?: number | string;
+  lastWeek?: number | string;
+  lastMonth?: number | string;
+  price?: number | string;
+  change?: number | string | {
+    dir?: "up" | "down" | "flat";
+    pct?: number | string;
+  };
+  markets?: Product["markets"];
+};
+
+type ApiCategory = {
+  id?: number | string;
+  _id?: string;
+  slug?: string;
+  name?: string;
+  nameBn?: string;
+  name_bn?: string;
+  icon?: string;
+};
+
 function normalizeProduct(item: ApiProduct): Product {
-  const changePercent = Number(item.change?.pct ?? 0);
+  const today = Number(item.today ?? item.price ?? 0);
+  const yesterday = Number(item.yesterday ?? 0);
+
+  const changePercent =
+    typeof item.change === "object" && item.change !== null
+      ? Number(item.change.pct ?? 0)
+      : Number(item.change ?? 0);
+
+  const direction =
+    typeof item.change === "object" && item.change !== null
+      ? item.change.dir
+      : changePercent > 0
+        ? "up"
+        : changePercent < 0
+          ? "down"
+          : "flat";
 
   return {
-    id: item.id,
-    slug: item.slug,
-    name: item.nameBn ?? "নাম পাওয়া যায়নি",
-    nameBn: item.nameBn,
+    id: item.id ?? item._id ?? item.slug ?? "",
+    slug: item.slug ?? String(item.id ?? item._id ?? ""),
+    name: item.nameBn ?? item.name_bn ?? item.name ?? "নাম পাওয়া যায়নি",
+    nameBn: item.nameBn ?? item.name_bn ?? item.name,
     category: item.category,
     categoryNameBn: item.categoryNameBn,
-    price: Number(item.today ?? 0),
-    today: item.today,
-    yesterday: item.yesterday,
-    lastWeek: item.lastWeek,
-    lastMonth: item.lastMonth,
+    price: today,
+    today,
+    yesterday,
+    lastWeek: Number(item.lastWeek ?? 0),
+    lastMonth: Number(item.lastMonth ?? 0),
     unit: item.unit,
-    emoji: item.image ?? item.categoryIcon ?? "🛒",
+    emoji: item.emoji ?? item.categoryIcon ?? "🛒",
     image: item.image,
     change: changePercent,
     changePercent,
-    changeDirection: item.change?.dir ?? "flat",
+    changeDirection: direction ?? "flat",
     markets: item.markets ?? [],
   };
 }
 
-// API category-কে application-এর Category type-এ রূপান্তর
 function normalizeCategory(item: ApiCategory): Category {
   return {
-    id: item.id,
-    slug: item.slug ?? String(item.id),
-    name: item.nameBn ?? "অন্যান্য",
-    nameBn: item.nameBn,
+    id: item.id ?? item._id ?? item.slug ?? "",
+    slug: item.slug ?? String(item.id ?? item._id ?? ""),
+    name: item.nameBn ?? item.name_bn ?? item.name ?? "অন্যান্য",
+    nameBn: item.nameBn ?? item.name_bn ?? item.name,
     icon: item.icon ?? "🛒",
   };
 }
 
-// সব products
 export async function getProducts(): Promise<Product[]> {
-  const data = await fetchJson<ApiProduct[]>(
-    `${API_URL}/products`
-  );
+  const response = await fetchJson<unknown>(`${API_URL}/products`);
+  const items = extractArray<ApiProduct>(response, [
+    "products",
+    "items",
+    "results",
+  ]);
 
-  return data.map(normalizeProduct);
+  return items.map(normalizeProduct);
 }
 
-// সব categories
 export async function getCategories(): Promise<Category[]> {
-  const data = await fetchJson<ApiCategory[]>(
-    `${API_URL}/categories`
-  );
+  const response = await fetchJson<unknown>(`${API_URL}/categories`);
+  const items = extractArray<ApiCategory>(response, [
+    "categories",
+    "items",
+    "results",
+  ]);
 
-  return data.map(normalizeCategory);
+  return items.map(normalizeCategory);
 }
 
-// নির্দিষ্ট category-এর products
 export async function getProductsByCategory(
   category: string
 ): Promise<Product[]> {
-  const data = await fetchJson<ApiProduct[]>(
+  const response = await fetchJson<unknown>(
     `${API_URL}/products?category=${encodeURIComponent(category)}`
   );
 
-  return data.map(normalizeProduct);
+  const items = extractArray<ApiProduct>(response, [
+    "products",
+    "items",
+    "results",
+  ]);
+
+  return items.map(normalizeProduct);
 }
 
-// নির্দিষ্ট ID বা slug দিয়ে product খোঁজা
 export async function getProduct(
   slugOrId: string
 ): Promise<Product | null> {
@@ -128,26 +181,16 @@ export async function getProduct(
   );
 }
 
-// নির্দিষ্ট slug দিয়ে category খোঁজা
 export async function getCategory(
   slug: string
 ): Promise<Category | null> {
-  const response = await fetch(
-    `${API_URL}/categories/${encodeURIComponent(slug)}`,
-    { cache: "no-store" }
+  const categories = await getCategories();
+
+  return (
+    categories.find(
+      (category) =>
+        category.slug === slug ||
+        String(category.id) === slug
+    ) ?? null
   );
-
-  if (response.status === 404) {
-    return null;
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      `Category API failed: ${response.status}`
-    );
-  }
-
-  const data: ApiCategory = await response.json();
-
-  return normalizeCategory(data);
 }
