@@ -1,8 +1,15 @@
+
 import type { Product } from "@/types";
 
 type PriceTickerProps = {
   products: Product[];
 };
+
+function toBengaliNumber(value: number) {
+  return value.toLocaleString("bn-BD", {
+    maximumFractionDigits: 2,
+  });
+}
 
 export default function PriceTicker({
   products,
@@ -15,39 +22,67 @@ export default function PriceTicker({
     <div className="overflow-hidden border-y border-emerald-100 bg-emerald-50">
       <div className="ticker-track flex w-max items-center">
         {items.map((product, index) => {
-          const change = Number(
+          const rawChange = Number(
             product.changePercent ?? product.change ?? 0
           );
+
+          const change = Number.isFinite(rawChange)
+            ? rawChange
+            : 0;
+
+          const direction =
+            product.changeDirection ??
+            (change > 0
+              ? "up"
+              : change < 0
+                ? "down"
+                : "flat");
+
+          const isUp = direction === "up";
+          const isDown = direction === "down";
+
+          const price = Number(
+            product.today ?? product.price
+          );
+
+          const name =
+            product.nameBn ?? product.name ?? "পণ্য";
 
           return (
             <div
               key={`${product.id}-${index}`}
               className="flex shrink-0 items-center gap-2 px-5 py-3 text-sm"
             >
-              <span>{product.emoji || "🛒"}</span>
+              <span>
+                {product.image ?? product.emoji ?? "🛒"}
+              </span>
 
               <span className="font-medium text-gray-800">
-                {product.name}
+                {name}
               </span>
 
               <span className="font-bold text-gray-900">
-                {Number(product.price || 0).toLocaleString("bn-BD")} টাকা
+                {Number.isFinite(price)
+                  ? `${toBengaliNumber(price)} টাকা`
+                  : "দাম পাওয়া যায়নি"}
               </span>
 
               <span
                 className={
-                  change > 0
-                    ? "font-semibold text-emerald-700"
-                    : change < 0
-                      ? "font-semibold text-red-600"
-                      : "text-gray-500"
+                  isUp
+                    ? "font-semibold text-red-600"
+                    : isDown
+                      ? "font-semibold text-emerald-700"
+                      : "font-semibold text-gray-500"
                 }
               >
-                {change > 0 ? "▲" : change < 0 ? "▼" : "—"}
-                {Math.abs(change).toLocaleString("bn-BD")}%
+                {isUp ? "▲" : isDown ? "▼" : "—"}
+                {toBengaliNumber(Math.abs(change))}%
               </span>
 
-              <span className="ml-3 text-emerald-200">•</span>
+              <span className="ml-3 text-emerald-200">
+                •
+              </span>
             </div>
           );
         })}

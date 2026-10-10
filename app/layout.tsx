@@ -1,7 +1,7 @@
-
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
@@ -19,16 +19,16 @@ export default function RootLayout({
     <html lang="bn">
       <body>
         <Suspense
-          fallback={
-            <header className="min-h-20 bg-white shadow-sm" />
-          }
-        >
-          <Navbar />
-        </Suspense>
+  fallback={<header className="min-h-20 bg-white shadow-sm" />}
+>
+  <Navbar />
+</Suspense>
 
-        {children}
+{children}
 
-        <Toaster position="top-right" />
+<Footer />
+
+<Toaster position="top-right" />
       </body>
     </html>
   );
