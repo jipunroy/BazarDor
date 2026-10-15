@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, type FormEvent } from "react";
@@ -47,7 +46,7 @@ export default function SignUpForm() {
         name: trimmedName,
         email: trimmedEmail,
         password,
-        callbackURL: "/",
+        callbackURL: "/signin",
       });
 
       if (result.error) {
@@ -58,7 +57,7 @@ export default function SignUpForm() {
       }
 
       toast.success("অ্যাকাউন্ট তৈরি হয়েছে!");
-      router.push("/");
+      router.push("/signin");
       router.refresh();
     } catch (error) {
       console.error("Signup error:", error);
@@ -84,7 +83,8 @@ export default function SignUpForm() {
         );
         setSocialLoading(null);
       }
-    } catch {
+    } catch (error) {
+      console.error("Social signup error:", error);
       toast.error("সোশ্যাল লগইনে সমস্যা হয়েছে। আবার চেষ্টা করো।");
       setSocialLoading(null);
     }
@@ -101,7 +101,10 @@ export default function SignUpForm() {
           disabled={busy}
           className="flex w-full items-center justify-center gap-3 rounded-lg border border-[#dce7dc] bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <span className="text-lg font-bold text-[#4285F4]" aria-hidden="true">
+          <span
+            className="text-lg font-bold text-[#4285F4]"
+            aria-hidden="true"
+          >
             G
           </span>
           {socialLoading === "google"
@@ -201,7 +204,9 @@ export default function SignUpForm() {
 
             <button
               type="button"
-              onClick={() => setShowPassword((previous) => !previous)}
+              onClick={() =>
+                setShowPassword((previous) => !previous)
+              }
               aria-label={
                 showPassword ? "পাসওয়ার্ড লুকাও" : "পাসওয়ার্ড দেখাও"
               }
